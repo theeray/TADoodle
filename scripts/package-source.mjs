@@ -3,7 +3,7 @@ import { cpSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 const temp = '.source-package';
 rmSync(temp, {recursive:true,force:true});
 mkdirSync(`${temp}/tad-meet`,{recursive:true});
-for(const file of ['src','public/favicon.svg','public/tadoodle-logo.svg','public/tadoodle-logo-original.svg','index.html','vite.config.js','package.json','package-lock.json','firestore.rules','firebase.json','.env.example','.gitignore','.github','scripts','tests','README.md','LICENSE','NOTICE.md']) {
+for(const file of ['src','public/favicon.png','public/tadoodle-logo.svg','public/tadoodle-logo-original.svg','index.html','vite.config.js','package.json','package-lock.json','firestore.rules','firebase.json','.env.example','.gitignore','.github','scripts','tests','README.md','LICENSE','NOTICE.md']) {
   if(existsSync(file))cpSync(file,`${temp}/tad-meet/${file}`,{recursive:true});
 }
 mkdirSync('public',{recursive:true});

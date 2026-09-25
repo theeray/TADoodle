@@ -11,8 +11,8 @@ for (const [asset, mime] of [['tadoodle-logo.svg','image/svg+xml'],['source.zip'
   if (!js.includes(literal)) throw new Error(`Missing bundled reference: ${asset}`);
   js = js.replaceAll(literal, JSON.stringify(data));
 }
-const icon = `data:image/svg+xml;base64,${readFileSync('dist/favicon.svg').toString('base64')}`;
-html = html.replace('./favicon.svg', icon)
+const icon = `data:image/png;base64,${readFileSync('dist/favicon.png').toString('base64')}`;
+html = html.replaceAll('./favicon.png', icon)
   .replace(/<script type="module" crossorigin src="[^"]+"><\/script>/, () => `<script type="module">${js.replaceAll('</script','<\\/script')}</script>`)
   .replace(/<link rel="stylesheet" crossorigin href="[^"]+">/, () => `<style>${css}</style>`);
 writeFileSync(process.argv[2] || 'TADoodle-preview.html', html);
