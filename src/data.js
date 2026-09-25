@@ -1,8 +1,8 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, browserLocalPersistence, setPersistence } from 'firebase/auth';
-import { getFirestore, doc, collection, setDoc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, collection, setDoc, updateDoc, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
-import { makePoll, makeResponse, meetingSlots, isZone } from './scheduling';
+import { makePoll, makeResponse, meetingSlots, isZone, copyPollData, mergeResponses } from './scheduling';
 
 const config = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -42,7 +42,9 @@ export async function createPoll(input) {
   return ref.id;
 }
 export function watchPoll(id, onPoll, onResponses, onError) {
-  let stopped = false, offPoll, offResponses;
+  let stopped = false, offPoll, offResponses, offCopied;
+  let current = [], copied = [], currentReady = false, copiedReady = false, copyRequired;
+  const emit = () => { if (currentReady && copyRequired !== undefined && (!copyRequired || copiedReady)) onResponses(mergeResponses(copied, current)); };
   identity().then(() => {
     if (stopped) return;
     offPoll = onSnapshot(doc(db, 'polls', id), snap => {
@@ -51,11 +53,13 @@ export function watchPoll(id, onPoll, onResponses, onError) {
       if (typeof p.title !== 'string' || typeof p.organizerName !== 'string' || typeof p.description !== 'string' || !isZone(p.timezone) || ![30,60,90,120].includes(p.duration) || !Array.isArray(p.slotIds) || p.slotIds.length < 1 || p.slotIds.length > 672 || !p.slotIds.every(id => typeof id === 'string' && /^[0-9]{13}$/.test(id)) || !['open','closed'].includes(p.status) || (p.status === 'closed' && !p.slotIds.includes(p.selectedStart))) {
         onError(new Error('This poll contains invalid data and cannot be displayed.')); return;
       }
-      onPoll({id: snap.id, ...p});
+      copyRequired = p.schemaVersion === 2;
+      onPoll({id: snap.id, ...p}); emit();
+      if (p.schemaVersion === 2 && !offCopied) offCopied = onSnapshot(collection(db, 'polls', id, 'copiedResponses'), snap => { copied = snap.docs.map(d=>({uid:d.id,...d.data(),copied:true})); copiedReady = true; emit(); }, onError);
     }, onError);
-    offResponses = onSnapshot(collection(db, 'polls', id, 'responses'), snap => onResponses(snap.docs.map(doc => ({ uid: doc.id, ...doc.data() }))), onError);
+    offResponses = onSnapshot(collection(db, 'polls', id, 'responses'), snap => { current = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() })); currentReady = true; emit(); }, onError);
   }).catch(onError);
-  return () => { stopped = true; offPoll?.(); offResponses?.(); };
+  return () => { stopped = true; offPoll?.(); offResponses?.(); offCopied?.(); };
 }
 export async function saveResponse(poll, name, values) {
   const user = await identity();
@@ -69,4 +73,23 @@ export async function chooseTime(poll, start) {
 export async function reopenPoll(poll) {
   await identity();
   await updateDoc(doc(db, 'polls', poll.id), { status: 'open', selectedStart: '' });
+}
+
+export async function renamePoll(poll, title) {
+  await identity();
+  title = title.trim();
+  if (!title || title.length > 100) throw new Error('Enter a title up to 100 characters.');
+  await updateDoc(doc(db, 'polls', poll.id), {title});
+}
+export async function duplicatePoll(source, responses, title, dates) {
+  const user = await identity();
+  if (user.uid !== source.ownerUid) throw new Error('Only the organizer can copy this poll.');
+  if (responses.length > 400) throw new Error('Copying supports up to 400 participants.');
+  const copy = copyPollData(source, responses, title, dates, user.uid);
+  const ref = doc(collection(db, 'polls'));
+  const batch = writeBatch(db);
+  batch.set(ref, {...copy.poll, createdAt:serverTimestamp()});
+  for (const {uid, copied, ...response} of copy.responses) batch.set(doc(ref, 'copiedResponses', uid), {...response, updatedAt:serverTimestamp()});
+  await batch.commit();
+  return ref.id;
 }

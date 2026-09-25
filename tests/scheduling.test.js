@@ -56,3 +56,23 @@ test('rejects invalid ranges, dates, zones, and meetings longer than the range',
  assert.throws(()=>createSlots(input.dates,540,600,'not/a-zone'));
  assert.throws(()=>makePoll({...input,duration:120,endMinute:600},'owner'));
 });
+
+
+test('copy preserves Central wall times across DST and remaps every response', async () => {
+ const {copyPollData,mergeResponses}=await import('../src/scheduling.js');
+ const old=makePoll({title:'Original',organizerName:'Eric',description:'Context',dates:['2026-10-30','2026-10-31'],timezone:'America/Chicago',startMinute:540,endMinute:660,duration:60},'owner');
+ const response={uid:'alice',name:'Alice',available:[old.slotIds[0]],ifNeeded:[old.slotIds[1]]};
+ const copy=copyPollData({...old,status:'closed',selectedStart:old.slotIds[0]},[response],'New title',['2026-11-06','2026-11-07'],'owner');
+ assert.equal(copy.poll.title,'New title'); assert.equal(copy.poll.status,'open'); assert.equal(copy.poll.selectedStart,'');
+ assert.equal(Number(copy.responses[0].available[0])-Number(response.available[0]),(7*24+1)*3600000);
+ assert.equal(copy.responses[0].ifNeeded[0],copy.poll.slotIds[1]); assert.equal(copy.responses[0].copied,true);
+ assert.equal(old.title,'Original');
+ assert.deepEqual(mergeResponses(copy.responses,[{...copy.responses[0],available:[],copied:false}])[0].available,[]);
+ assert.throws(()=>copyPollData(old,[response],'New',['2026-11-06','2026-11-06'],'owner'),/different replacement/);
+});
+test('copy rejects nonexistent and ambiguous local times instead of shifting availability',async()=>{
+ const {copyPollData}=await import('../src/scheduling.js');
+ const old=makePoll({title:'Original',organizerName:'Eric',dates:['2026-03-07'],timezone:'America/Chicago',startMinute:60,endMinute:240,duration:60},'owner');
+ assert.throws(()=>copyPollData(old,[],'Spring',['2026-03-08'],'owner'),/daylight-saving/);
+ assert.throws(()=>copyPollData(old,[],'Fall',['2026-11-01'],'owner'),/daylight-saving/);
+});

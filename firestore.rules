@@ -23,14 +23,34 @@ service cloud.firestore {
         && request.resource.data.slotIds.toSet().size() == request.resource.data.slotIds.size()
         && request.resource.data.status == 'open'
         && request.resource.data.selectedStart == ''
-        && request.resource.data.schemaVersion == 1
+        && request.resource.data.schemaVersion in [1,2]
         && request.resource.data.createdAt == request.time;
       allow update: if signedIn() && resource.data.ownerUid == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','selectedStart'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','selectedStart','title'])
+        && nonblank(request.resource.data.title, 100)
         && ((request.resource.data.status == 'open' && request.resource.data.selectedStart == '')
           || (request.resource.data.status == 'closed'
             && request.resource.data.selectedStart in resource.data.slotIds));
       allow delete: if false;
+      // Imported availability is an immutable baseline, never a participant submission.
+      match /copiedResponses/{uid} {
+        allow read: if signedIn() && exists(/databases/$(database)/documents/polls/$(pollId));
+        allow create: if signedIn()
+          && !exists(/databases/$(database)/documents/polls/$(pollId))
+          && getAfter(/databases/$(database)/documents/polls/$(pollId)).data.ownerUid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/polls/$(pollId)).data.schemaVersion == 2
+          && request.resource.data.keys().hasOnly(['name','available','ifNeeded','updatedAt'])
+          && nonblank(request.resource.data.name, 60)
+          && request.resource.data.available is list && request.resource.data.ifNeeded is list
+          && request.resource.data.available.size() <= 672 && request.resource.data.ifNeeded.size() <= 672
+          && request.resource.data.available.toSet().size() == request.resource.data.available.size()
+          && request.resource.data.ifNeeded.toSet().size() == request.resource.data.ifNeeded.size()
+          && request.resource.data.available.hasOnly(getAfter(/databases/$(database)/documents/polls/$(pollId)).data.slotIds)
+          && request.resource.data.ifNeeded.hasOnly(getAfter(/databases/$(database)/documents/polls/$(pollId)).data.slotIds)
+          && !request.resource.data.available.hasAny(request.resource.data.ifNeeded)
+          && request.resource.data.updatedAt == request.time;
+        allow update, delete: if false;
+      }
       match /responses/{uid} {
         allow read: if signedIn() && exists(/databases/$(database)/documents/polls/$(pollId));
         allow create, update: if signedIn() && request.auth.uid == uid

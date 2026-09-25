@@ -17,7 +17,20 @@ No Google/Outlook/Apple calendar sync, account screens, dashboards, email remind
 
 ## Current delivery status
 
-The implementation is built and tested. It has not been connected to a live Firebase project or deployed to GitHub Pages. Without configuration the app displays **Preview mode** and uses temporary in-memory sample data. Sharing is disabled there. Refreshing a preview clears its edits.
+The app is hosted at https://theeray.github.io/TADoodle/ and the Pages workflow includes public configuration for Firebase project `tadoodle-35e15`. Repository variables can override that configuration. Local development without Firebase environment values still uses temporary preview data.
+
+### Update required for title editing and copies
+
+Publish the current `firestore.rules` in Firebase Console → Firestore → Rules. GitHub Pages deployment does not publish database rules. Existing polls remain compatible.
+
+### Rename, copy, and reuse templates
+
+- In the organizer's original browser, use **Edit title** to rename an open or closed poll. Its link, dates, and responses stay the same.
+- **Copy poll** creates an independent open poll. Enter a new title and a replacement for each original date. Meeting length, description, names, and local time availability carry over. Save any pending response changes before copying.
+- Copied responses are labeled as awaiting confirmation, and included in the availability summary. Participants using their original browser can save a new response that replaces their copied baseline. The baseline cannot be edited by the organizer after creation. Clearing browser data loses that participant identity.
+- Times stay in the original poll's zone across daylight-saving offset changes. Missing or repeated clock-change hours are rejected rather than guessed. Copies support up to 400 responses.
+- **Save as template** adds a shortcut to **Your templates** on the New poll page. The shortcut list is stored in this browser; bookmark the poll link as a backup. Removing a shortcut does not delete the poll. A template remains an ordinary poll, so later responses will be included in future copies.
+- Phone layouts use larger touch targets, three date columns, stacked forms and scrollable dialogs.
 
 The project is a new React/Firebase implementation inspired by Timeful; it is not a port of Timeful's full Vue/Go/MongoDB codebase. See NOTICE.md.
 
@@ -51,8 +64,8 @@ Optional: register your deployed app with Firebase App Check using reCAPTCHA v3,
 
 ## Publish on GitHub Pages
 
-1. Create a public GitHub repository named `tadoodle`. Upload this project's source, including `.github/workflows/pages.yml` and `package-lock.json`, with `main` as the branch.
-2. In **Settings → Secrets and variables → Actions → Variables**, add these repository variables using the values from the Firebase web config:
+1. Use the public GitHub repository `theeray/TADoodle`. Upload this project's source, including `.github/workflows/pages.yml` and `package-lock.json`, with `main` as the branch.
+2. Firebase values are already configured in the workflow. To use a different project, optionally override them in **Settings → Secrets and variables → Actions → Variables**:
 
    | Variable | Firebase config value |
    | --- | --- |

@@ -36,3 +36,14 @@ html,body,#root{background:#f5f7f7;color:#203538;color-scheme:light}
 .page-intro>div>p:last-child{color:#445d62}
 
 .save-bar>.notice{width:100%;margin-bottom:0}
+
+.poll-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:0 0 24px}.modal-actions{margin-top:24px}.copy-zone{margin:16px 0!important;color:#335a60!important}.copy-dates{display:grid;gap:12px;max-height:36vh;overflow:auto}.copy-dates>div{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:center}.copy-dates label{margin:0}.template-list{margin-bottom:24px}.template-list>p{color:#445d62;margin:8px 0 16px}.template-list>div{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid var(--line)}.template-list a{font-weight:650;overflow-wrap:anywhere}.poll-heading h1{overflow-wrap:anywhere}
+@media(max-width:580px){
+  .header-inner{flex-wrap:wrap;gap:12px}.brand-logo{max-width:min(60vw,240px);height:auto}.header-action{min-height:44px}
+  input,select,textarea{font-size:16px}.icon-button{width:44px;height:44px}.time-cell{min-height:44px}.calendar-days button{min-height:44px}
+  .poll-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.poll-actions .text-button{grid-column:1/-1;min-height:44px;justify-content:center}
+  .modal{max-height:calc(100dvh - 24px);overflow-y:auto;padding:20px;max-width:calc(100% - 24px)}.copy-dates>div{grid-template-columns:1fr;gap:6px}.copy-dates{max-height:none}.copy-dates input{min-width:0}
+  .template-list>div{align-items:flex-start;flex-direction:column;gap:4px}.template-list .text-button{min-height:44px}
+  .grid-footer{flex-wrap:wrap}.grid-footer>.text-button{min-height:44px}.poll-heading>.primary-button{width:100%}
+  .view-tabs button{min-height:44px}.paint-tools button{min-height:44px}.person-status{flex-wrap:wrap}.person-status small{margin-left:0}
+}

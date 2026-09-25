@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import test,{before,after,beforeEach} from 'node:test';
 import {initializeTestEnvironment,assertSucceeds,assertFails} from '@firebase/rules-unit-testing';
-import {doc,setDoc,updateDoc,getDoc,getDocs,collection,serverTimestamp} from 'firebase/firestore';
+import {doc,setDoc,updateDoc,getDoc,getDocs,collection,serverTimestamp,writeBatch} from 'firebase/firestore';
 import {makePoll} from '../src/scheduling.js';
 let env;
 const id='unit-test-poll';
@@ -49,4 +49,28 @@ test('does not expose a public list of polls or accept unauthenticated writes',a
 test('cannot create a poll owned by someone else or with unexpected fields',async()=>{
  await assertFails(setDoc(doc(db('a'),'polls','forged'),{...poll,createdAt:serverTimestamp()}));
  await assertFails(setDoc(doc(db('owner'),'polls','extra'),{...poll,createdAt:serverTimestamp(),secret:'no'}));
+});
+
+test('only organizer can rename, including closed polls, with a valid title',async()=>{
+ const ref=doc(db('owner'),'polls',id);
+ await assertSucceeds(updateDoc(ref,{title:'Renamed'}));
+ await assertFails(updateDoc(doc(db('a'),'polls',id),{title:'Hijack'}));
+ await assertFails(updateDoc(ref,{title:'  '}));
+ await assertFails(updateDoc(ref,{title:'x'.repeat(101)}));
+ await updateDoc(ref,{status:'closed',selectedStart:poll.slotIds[0]});
+ await assertSucceeds(updateDoc(ref,{title:'Closed renamed'}));
+});
+test('copied baselines are atomic, immutable, and separate from participant responses',async()=>{
+ const owner=db('owner'), target='copied-poll';
+ const batch=writeBatch(owner);
+ batch.set(doc(owner,'polls',target),{...poll,schemaVersion:2,createdAt:serverTimestamp()});
+ batch.set(doc(owner,'polls',target,'copiedResponses','a'),response());
+ await assertSucceeds(batch.commit());
+ await assertSucceeds(getDocs(collection(db('a'),'polls',target,'copiedResponses')));
+ await assertFails(updateDoc(doc(owner,'polls',target,'copiedResponses','a'),{name:'Overwrite'}));
+ await assertFails(setDoc(doc(owner,'polls',target,'copiedResponses','b'),response()));
+ await assertFails(setDoc(doc(db('b'),'polls',id,'copiedResponses','a'),response()));
+ await assertSucceeds(setDoc(doc(db('a'),'polls',target,'responses','a'),response('Confirmed')));
+ const attacker=db('b');const bad=writeBatch(attacker);bad.set(doc(attacker,'polls','forged-copy'),{...poll,schemaVersion:2,createdAt:serverTimestamp()});bad.set(doc(attacker,'polls','forged-copy','copiedResponses','a'),response());await assertFails(bad.commit());
+ const invalid=writeBatch(owner);invalid.set(doc(owner,'polls','invalid-copy'),{...poll,schemaVersion:2,createdAt:serverTimestamp()});invalid.set(doc(owner,'polls','invalid-copy','copiedResponses','a'),{...response(),available:['invalid']});await assertFails(invalid.commit());
 });

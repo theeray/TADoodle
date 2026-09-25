@@ -92,3 +92,25 @@ export function groupGrid(slotIds, zone) {
   const offsets = new Set([...rows.values()].map(r => r.utcOffset));
   return { days: [...days.values()].sort((a,b) => a.date.localeCompare(b.date)), rows: [...rows.values()].sort((a,b) => a.minute - b.minute || b.utcOffset - a.utcOffset), showOffset: offsets.size > 1 };
 }
+
+// Copies preserve wall-clock times in the poll's original zone, not UTC offsets.
+export function copyPollData(source, responses, title, dates, uid) {
+  title = String(title || '').trim();
+  if (!title || title.length > 100) throw new Error('Enter a title up to 100 characters.');
+  const sourceDates = [...new Set(source.slotIds.map(id => slotTime(id, source.timezone).toISODate()))].sort();
+  if (dates.length !== sourceDates.length || new Set(dates).size !== dates.length) throw new Error('Choose a different replacement date for every original date.');
+  const map = new Map();
+  for (const id of source.slotIds) {
+    const old = slotTime(id, source.timezone);
+    const date = dates[sourceDates.indexOf(old.toISODate())];
+    const next = DateTime.fromISO(`${date}T${old.toFormat('HH:mm')}`, {zone: source.timezone});
+    if (!next.isValid || next.toISODate() !== date || next.toFormat('HH:mm') !== old.toFormat('HH:mm') || next.getPossibleOffsets().length !== 1 || old.getPossibleOffsets().length !== 1) throw new Error('These dates include a missing or repeated daylight-saving hour. Choose dates outside that clock change.');
+    map.set(id, String(next.toMillis()));
+  }
+  const poll = {title, description: source.description, organizerName: source.organizerName, ownerUid: uid, timezone: source.timezone, duration: source.duration, slotIds: [...map.values()].sort(), status: 'open', selectedStart: '', schemaVersion: 2};
+  const copied = responses.map(r => ({uid:r.uid, ...makeResponse(r.name, Object.fromEntries(Object.entries(responseValues(r)).map(([id,value])=>[map.get(id),value])), poll), copied:true}));
+  return {poll, responses:copied};
+}
+export function mergeResponses(copied, current) {
+  return [...new Map([...copied, ...current].map(r=>[r.uid,r])).values()];
+}
